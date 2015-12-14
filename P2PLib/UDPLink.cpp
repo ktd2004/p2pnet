@@ -154,8 +154,9 @@ retry_send:
 }
 
 
-bool UDPLink::IsReceived( void )
+bool UDPLink::IsReceived( unsigned long iWait )
 {
+	m_Wait.tv_usec = iWait * 1000;
 	FD_ZERO( &m_rFdSet );
 	FD_SET( m_hSocket, &m_rFdSet);
 
@@ -182,7 +183,7 @@ int UDPLink::RecvFrom( char* pszBuf, SOCKADDR_IN* from )
 	if (iResult == SOCKET_ERROR)
 	{
 		DWORD dwErrorCode = WSAGetLastError();
-		if ( dwErrorCode != ERROR_IO_PENDING && dwErrorCode != WSAEWOULDBLOCK )
+		if ( dwErrorCode != ERROR_IO_PENDING && dwErrorCode != WSAEWOULDBLOCK && dwErrorCode != WSAECONNRESET )
 		{
 			printf("error: %s,%d recvfrom %d\n", __FILE__,__LINE__, dwErrorCode );
 			return -1;

@@ -29,6 +29,7 @@
 
 NetPc::NetPc()
 {
+
 }
 
 NetPc::NetPc(NetPcManager* pNetPcMgr, UDPLink* pLink)
@@ -36,151 +37,176 @@ NetPc::NetPc(NetPcManager* pNetPcMgr, UDPLink* pLink)
 {
 }
 
-NetPc::NetPc(const NetPc& r)
-{
-	this->m_NetLinkManager		= r.m_NetLinkManager;
-	this->m_Link				= r.m_Link;
-	this->iCellID				= r.iCellID;
-	this->iID					= r.iID;
-	this->iAddr					= r.iAddr;
-	this->iPort					= r.iPort;
-	this->iSt					= r.iSt;
-	this->iUnreliablePktSeq		= r.iUnreliablePktSeq;
-	this->iReliablePktSeq		= r.iReliablePktSeq;
-	this->iWishReliablePktSeq	= r.iWishReliablePktSeq;
-	this->iControlPktSeq		= r.iControlPktSeq;
-	this->iWishControlPktSeq	= r.iWishControlPktSeq;
-}
-
 NetPc::~NetPc()
 {
 }
 
- int NetPc::OnReceived( P2PNET_PACKET_BASE* pPkt )
+int NetPc::OnJoin( P2PNET_PACKET_BASE* pPkt )
 {
-	if ( Pc::OnReceived(pPkt) )
+	m_iReceivedPktTm = timeGetTime();
+
+//	verbose( "recv join %u\n", pPkt->iFromID  );
+	P2P_JOIN_ACK p(pPkt->iPktSeq, pPkt->iCellID, m_NetLinkManager->Self().iNID, pPkt->iTransTick);
+	p.iTransTick = pPkt->iTransTick;
+	m_Link->Send((const char*)&p.iLen, p.iLen, &pPkt->Addr);
+	Network_IF& nif = ((P2P_JOIN*)pPkt)->NIF;
+
+	if ( m_iWishControlPktSeq == pPkt->iPktSeq )
 	{
-		delete[] pPkt;
-		return 1;
+		m_iWishControlPktSeq++;
+		if ( m_NetLinkManager->Self().iNID == nif.iNID )
+		{
+			verbose( "join self %u, public %s\n", nif.iNID, Util::Addr2Str(&nif).c_str() );
+		}
+		else
+		{
+			verbose( "join peer %u public %s\n", nif.iNID, Util::Addr2Str(&nif).c_str() );
+			m_NetLinkManager->Connect( nif );
+		}
 	}
 
+	delete[] pPkt;
+
+	return 1;
+}
+
+int NetPc::OnLeave( P2PNET_PACKET_BASE* pPkt )
+{
+	m_iReceivedPktTm = timeGetTime();
+
+//	verbose( "recv join %u\n", pPkt->iFromID  );
+	P2P_LEAVE_ACK p(pPkt->iPktSeq, pPkt->iCellID,  m_NetLinkManager->Self().iNID, pPkt->iTransTick);
+	p.iTransTick = pPkt->iTransTick;
+	m_Link->Send((const char*)&p.iLen, p.iLen, &pPkt->Addr);
+	Network_IF& nif = ((P2P_JOIN*)pPkt)->NIF;
+
+	if ( m_iWishControlPktSeq == pPkt->iPktSeq )
+	{
+		m_iWishControlPktSeq++;
+		if ( m_NetLinkManager->Self().iNID == nif.iNID )
+		{
+			verbose( "leave self %u, public %s\n", nif.iNID, Util::Addr2Str(&nif).c_str() );
+		}
+		else
+		{
+			verbose( "leave peer %u public %s\n", nif.iNID, Util::Addr2Str(&nif).c_str() );
+			NetLink* pLink = m_NetLinkManager->Find( nif );
+			m_NetLinkManager->Close( pLink );
+		}
+	}
+
+	delete[] pPkt;
+
+	return 1;
+}
+
+int NetPc::OnReliableAck( P2PNET_PACKET_BASE* pPkt )
+{
+	m_iReceivedPktTm = timeGetTime();
+
+	Latency( m_iReceivedPktTm - pPkt->iTransTick );
+	verbose( "recv reliable ack %lu\n", pPkt->iPktSeq );
+	for ( P2PNET_PACKET_LIST::iterator it = m_Reliable.begin(); it != m_Reliable.end(); it++ )
+	{
+		P2PNET_PACKET_BASE* p = *it;
+		if ( p->iPktSeq == pPkt->iPktSeq )
+		{
+			verbose( "erase reliable ack %lu\n", pPkt->iPktSeq );
+			m_Reliable.erase( it );
+			m_NetLinkManager->OnSended( this, PKT_DATA_POS(p), PKT_DATA_LEN(p) );
+			delete[] p;
+			break;
+		}
+	}
+
+	delete[] pPkt;
+
+	return 1;
+}
+
+int NetPc::OnReliableSendTo( P2PNET_PACKET_BASE* pPkt )
+{
+	m_iReceivedPktTm = timeGetTime();
+
+	verbose( "recv reliable pkt %lu, wish %lu\n", pPkt->iPktSeq, m_iWishReliablePktSeq );
+//	verbose( "from %u to %u\n", iNID, m_NetLinkManager->Self().iNID );
+	P2P_RELIABLE_ACK p(pPkt->iPktSeq, pPkt->iCellID, m_NetLinkManager->Self().iNID, iNID, pPkt->iTransTick);
+	m_Link->Send((const char*)&p.iLen, p.iLen, &pPkt->Addr);
+
+	// 수신 받은 패킷 순서가 올바른지 검증
+	if ( m_iWishReliablePktSeq == pPkt->iPktSeq )
+	{
+		verbose( "find reliable pkt %lu\n", pPkt->iPktSeq );
+		m_iWishReliablePktSeq++;
+		m_NetLinkManager->OnReceived( this, PKT_DATA_POS(pPkt), PKT_DATA_LEN(pPkt) );
+
+		// 혹시 순서가 바뀐 패킷이 있는지 확인
+		for ( P2PNET_PACKET_LIST::iterator it = m_WaitReliable.begin(); it != m_WaitReliable.end(); )
+		{
+			P2PNET_PACKET_BASE* p = *it;
+			if ( m_iWishReliablePktSeq == p->iPktSeq )
+			{
+				verbose( "find reliable pkt %lu\n", pPkt->iPktSeq );
+				m_iWishReliablePktSeq++;
+				m_NetLinkManager->OnReceived( this, PKT_DATA_POS(p), PKT_DATA_LEN(p) );
+				it = m_WaitReliable.erase(it);
+				delete[] p;
+			}
+			else if ( m_iWishReliablePktSeq > p->iPktSeq )
+			{
+				it = m_WaitReliable.erase(it);
+				delete[] p;
+			}
+			else
+			{
+				it++;
+			}
+		}
+	}
+	else if ( m_iWishReliablePktSeq < pPkt->iPktSeq )
+	{
+		verbose( "wait reliable pkt %lu\n", pPkt->iPktSeq );
+		m_WaitReliable.push_back( pPkt );
+		return 0;
+	}
+
+	delete[] pPkt;
+
+	return 1;
+}
+
+
+int NetPc::OnReceived( P2PNET_PACKET_BASE* pPkt )
+{
 	switch (pPkt->iPackID)
 	{
-	case eP2P_RELIABLE_ACK			:
-		{
-			Latency(  NetST().iReceivedPktTm - pPkt->iTransTick );
-			verbose( "recv reliable ack %lu\n", pPkt->iPktSeq );
-			for ( P2PNET_PACKET_LIST::iterator it = m_Reliable.begin(); it != m_Reliable.end(); it++ )
-			{
-				P2PNET_PACKET_BASE* p = *it;
-				if ( p->iPktSeq == pPkt->iPktSeq )
-				{
-					verbose( "erase reliable ack %d\n", pPkt->iPktSeq );
-					m_Reliable.erase( it );
-					m_NetLinkManager->OnSended( this, PKT_DATA_POS(p), PKT_DATA_LEN(p) );
-					delete[] p;
-					break;
-				}
-			}
-		}
+	case eP2P_SYNC :
+		OnSync( pPkt );
 		break;
-	case eP2P_JOIN					:
-		{
-			//verbose( "recv join %u, self %u\n", pPkt->iFromID, m_NetLinkManager->Self()->NetIF().iID  );
-			P2P_JOIN_ACK p(pPkt->iPktSeq, pPkt->iCellID, m_NetLinkManager->Self()->NetIF().iID);
-			p.iTransTick = pPkt->iTransTick;
-			m_Link->Send((const char*)&p.iLen, p.iLen, &pPkt->Addr);
-			Network_IF& nif = ((P2P_JOIN*)pPkt)->NIF;
-
-			if ( iWishControlPktSeq == pPkt->iPktSeq )
-			{
-				iWishControlPktSeq++;
-				if ( m_NetLinkManager->Self()->NetIF().iID == nif.iID )
-				{
-					verbose( "join self %u, public %s\n", nif.iID, Util::Addr2Str(&nif).c_str() );
-					m_NetLinkManager->Self(nif);
-				}
-				else
-				{
-					verbose( "join peer %u public %s\n", nif.iID, Util::Addr2Str(&nif).c_str() );
-					m_NetLinkManager->Insert( nif );
-				}
-			}
-		}
+	case eP2P_SYNC_ACK :
+		OnSyncAck( pPkt );
 		break;
-	case eP2P_LEAVE					:
-		{
-			//verbose( "recv join %u, self %u\n", pPkt->iFromID, m_NetLinkManager->Self()->NetIF().iID  );
-			P2P_LEAVE_ACK p(pPkt->iPktSeq, pPkt->iCellID, m_NetLinkManager->Self()->NetIF().iID);
-			p.iTransTick = pPkt->iTransTick;
-			m_Link->Send((const char*)&p.iLen, p.iLen, &pPkt->Addr);
-			Network_IF& nif = ((P2P_JOIN*)pPkt)->NIF;
-
-			if ( iWishControlPktSeq == pPkt->iPktSeq )
-			{
-				iWishControlPktSeq++;
-				if ( m_NetLinkManager->Self()->NetIF().iID == nif.iID )
-				{
-					verbose( "leave self %u, public %s\n", nif.iID, Util::Addr2Str(&nif).c_str() );
-				}
-				else
-				{
-					verbose( "leave peer %u public %s\n", nif.iID, Util::Addr2Str(&nif).c_str() );
-					m_NetLinkManager->Erase( nif );
-				}
-			}
-		}
+	case eP2P_KEEPING_CONNECTION :
+		OnKeepConnection( pPkt );
 		break;
-	case eP2P_RELIABLE_SEND_TO		:
-		{
-			verbose( "recv reliable pkt %d, wish %d\n", pPkt->iPktSeq, iWishReliablePktSeq );
-			P2P_RELIABLE_ACK p(pPkt->iPktSeq, pPkt->iCellID, m_NetLinkManager->Self()->NetIF().iID, pPkt->iFromID);
-			p.iTransTick = pPkt->iTransTick;
-			m_Link->Send((const char*)&p.iLen, p.iLen, &pPkt->Addr);
-
-			// 수신 받은 패킷 순서가 올바른지 검증
-			if ( iWishReliablePktSeq == pPkt->iPktSeq )
-			{
-				verbose( "find reliable pkt %d\n", pPkt->iPktSeq );
-				iWishReliablePktSeq++;
-				m_NetLinkManager->OnReceived( this, PKT_DATA_POS(pPkt), PKT_DATA_LEN(pPkt) );
-
-				// 혹시 순서가 바뀐 패킷이 있는지 확인
-				for ( P2PNET_PACKET_LIST::iterator it = m_WaitReliable.begin(); it != m_WaitReliable.end(); )
-				{
-					P2PNET_PACKET_BASE* p = *it;
-					if ( iWishReliablePktSeq == p->iPktSeq )
-					{
-						verbose( "find reliable pkt %d\n", pPkt->iPktSeq );
-						iWishReliablePktSeq++;
-						m_NetLinkManager->OnReceived( this, PKT_DATA_POS(p), PKT_DATA_LEN(p) );
-						it = m_WaitReliable.erase(it);
-						delete[] p;
-					}
-					else if ( iWishReliablePktSeq > p->iPktSeq )
-					{
-						it = m_WaitReliable.erase(it);
-						delete[] p;
-					}
-					else
-					{
-						it++;
-					}
-				}
-			}
-			else if ( iWishReliablePktSeq < pPkt->iPktSeq )
-			{
-				verbose( "wait reliable pkt %d\n", pPkt->iPktSeq );
-				m_WaitReliable.push_back( pPkt );
-				return 1;
-			}
-		}
+	case eP2P_JOIN :
+		OnJoin( pPkt );
+		break;
+	case eP2P_LEAVE :
+		OnLeave( pPkt );
+		break;
+	case eP2P_RELIABLE_ACK :
+		OnReliableAck( pPkt );
+		break;
+	case eP2P_RELIABLE_SEND_TO :
+		OnReliableSendTo( pPkt );
 		break;
 	default :
+		m_iReceivedPktTm = timeGetTime();
 		m_NetLinkManager->OnReceived( this, PKT_DATA_POS(pPkt), PKT_DATA_LEN(pPkt) );
+		delete[] pPkt;
 		break;
 	}
-	
-	delete[] pPkt;
+
 	return 1;
 }

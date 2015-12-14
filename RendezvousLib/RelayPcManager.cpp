@@ -25,23 +25,16 @@
 #include <windows.h>
 #include <Mmsystem.h>
 
-RelayPcManager::RelayPcManager( UDPLink* pLink, unsigned long iKeepConnection )
-: NetLinkManager( NULL, pLink, iKeepConnection )
+RelayPcManager::RelayPcManager( const Network_IF* pNIF, UDPLink* pLink, unsigned long iKeepConnection )
+: NetLinkManager( pNIF, NULL, pLink, iKeepConnection )
 {
-	std::string sIP;
-	unsigned short iPort;
-	pLink->GetSockInfo( sIP, iPort );
-
-	m_Self = OnCreate();
-	Network_IF& rNetIF = m_Self->NetIF();
-	Util::SetNetworkAddress( &rNetIF, sIP, iPort );
 }
 
 RelayPcManager::~RelayPcManager()
 {
 }
 
-NetLink* RelayPcManager::OnCreate( void )
+NetLink* RelayPcManager::OnCreate()
 {
 	return (NetLink*)new RelayPc( this, m_Link );
 }
@@ -55,14 +48,14 @@ int RelayPcManager::OnConnected( NetLink* pLink )
 		RelayPc* pc = (RelayPc*)it->second;
 		if ( pLink != (NetLink*)pc )
 		{	// 이미 조인한 모든 유저에게 알린다.
-			verbose( "send join %u to others %s\n", pLink->NetIF().iID, Util::Addr2Str(&pc->NetIF()).c_str() );
-			p = new P2P_JOIN( 0, m_Self->NetIF().iID, pLink->NetIF() );
+			verbose( "send join %u to others %s\n", pLink->NetIF().iNID, Util::Addr2Str(&pc->NetIF()).c_str() );
+			p = new P2P_JOIN( 0, m_Self.iNID, pLink->NetIF() );
 			pc->PushControl( p );
 		}
 
 		// 현재 조인한 모든 유저 정보를 알린다.
-		verbose( "send members %u to self %s\n", pc->NetIF().iID, Util::Addr2Str(&pc->NetIF()).c_str() );			
-		p = new P2P_JOIN( 0, m_Self->NetIF().iID, pc->NetIF() );
+		verbose( "send members %u to self %s\n", pc->NetIF().iNID, Util::Addr2Str(&pc->NetIF()).c_str() );			
+		p = new P2P_JOIN( 0, m_Self.iNID, pc->NetIF() );
 		((RelayPc*)pLink)->PushControl( p );
 	}
 
@@ -79,8 +72,8 @@ int RelayPcManager::OnClosed( NetLink* pLink )
 		RelayPc* pc = (RelayPc*)it->second;
 		if ( pLink != (NetLink*)pc )
 		{	// 이미 조인한 모든 유저에게 알린다.
-			verbose( "send leave %u to others %s\n", pLink->NetIF().iID, Util::Addr2Str(&pc->NetIF()).c_str() );
-			p = new P2P_LEAVE( 0, m_Self->NetIF().iID, pLink->NetIF() );
+			verbose( "send leave %u to others %s\n", pLink->NetIF().iNID, Util::Addr2Str(&pc->NetIF()).c_str() );
+			p = new P2P_LEAVE( 0, m_Self.iNID, pLink->NetIF() );
 			pc->PushControl( p );
 		}
 	}
@@ -95,11 +88,13 @@ int RelayPcManager::OnReceived( NetLink* pLink, const char* pPkt, unsigned int i
 	NetLinkMap::iterator it = m_NetLinkMap.find( p->iToID );
 	if ( it != m_NetLinkMap.end() )
 	{
-		// 패킷을 릴레이하기 위해서 그냥 넣는다.
-		verbose( "received relay from %u to %u\n", p->iFromID, p->iToID );
 		RelayPc* pc = (RelayPc*)it->second;
+		// LYJ 여기도 고쳐야 된다.
+		// Pc::Process() 에서 패킷을 전송할때 패킷의 전송 tick을 변경한다.
+		// 릴레이에서는 그냥 전송해야 된다.
 		Util::SetNetworkAddress( p, pc->NetIF() );
-		pc->m_Reserved.push_back( p );
+		verbose( "received relay from %u to %u(%s)\n", p->iFromID, p->iToID, Util::Addr2Str(&pc->NetIF()).c_str() );
+		m_Link->Send((const char*)&p->iLen, p->iLen, &p->Addr);
 		return 0;
 	}
 

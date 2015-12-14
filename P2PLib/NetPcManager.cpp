@@ -25,16 +25,9 @@
 #include <windows.h>
 #include <Mmsystem.h>
 
-NetPcManager::NetPcManager( P2PAgentHandler* pHandler, UDPLink* pLink, unsigned long iKeepConnection )
-: NetLinkManager( pHandler, pLink, iKeepConnection )
+NetPcManager::NetPcManager( const Network_IF* pNIF, P2PAgentHandler* pHandler, UDPLink* pLink, unsigned long iKeepConnection )
+: NetLinkManager( pNIF, pHandler, pLink, iKeepConnection )
 {
-	std::string sIP;
-	unsigned short iPort;
-	pLink->GetSockInfo( sIP, iPort );
-
-	m_Self = OnCreate();
-	Network_IF& rNetIF = m_Self->NetIF();
-	Util::SetNetworkAddress( &rNetIF, sIP, iPort );
 }
 
 NetPcManager::~NetPcManager()

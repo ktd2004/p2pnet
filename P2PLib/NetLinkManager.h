@@ -23,42 +23,45 @@
 //<
 #include <P2PAgent.h>
 
+//< created by p2p agent factory
 class NetLinkManager : public P2PAgent
 {
 	friend class Pc;
 protected:
-	P2PAgentHandler*	m_Handler;
-	UDPLink*			m_Link;
-	NetLinkMap			m_NetLinkMap;
-	NetLink*			m_Self;				// self link
+	P2PAgentHandler*	m_Handler;			// notify
+	UDPLink*			m_Link;				// udp
+	NetLinkMap			m_NetLinkMap;		// established link
 	NetLink*			m_Relay;			// relay link
 	P2PNET_PACKET_LIST	m_Received;			// received packet list
-	unsigned long		m_iKeepConnection;	// alive check
+	unsigned long		m_iKeepConnection;	// check alive
+	Network_IF			m_Self;				// self network information
 
 public:
-	NetLinkManager(P2PAgentHandler* pHandler, UDPLink* pLink, unsigned long iKeepConnection);
+	NetLinkManager( const Network_IF* pNIF, P2PAgentHandler* pHandler, UDPLink* pLink, unsigned long iKeepConnection );
 	virtual ~NetLinkManager();
 
 	//< P2PAgent
 	NetLinkMap&			GetHashMap( void ) { return m_NetLinkMap; }
-	NetLink*			Self( const Network_IF& rNetIF );
-	NetLink*			Self( void );
-	NetLink*			Find( const Network_IF& rNetIF );
-	NetLink*			Insert( const Network_IF& rNetIF );
-	bool				Erase( const Network_IF& rNetIF );
+	Network_IF&			Self( void ) { return m_Self; }
+	NetLink*			Connect( const Network_IF& rNIF );
+	bool				Close( NetLink* pLink );
+	NetLink*			Find( const Network_IF& rNIF );
 	void				Clear( void );
-	void				Process( void );
+	void				Process( unsigned long iWait );
+	NetLink*			Relay( void );
+
 	//<
 	P2PAgentHandler*	Handler( void );
 	P2PAgentHandler*	Handler( P2PAgentHandler* pHandler );
-	NetLink*			Relay( const Network_IF& rNetIF );
-	NetLink*			Relay( void );
+	NetLink*			Relay( const Network_IF& rNIF );	
+
 	//<
 	virtual int			OnConnected( NetLink* pLink );
 	virtual int			OnClosed( NetLink* pLink );
 	virtual int			OnReceived( NetLink* pLink, const char* pPkt, unsigned int iLen );
 	virtual int			OnSended( NetLink* pLink, const char* pPkt, unsigned int iLen );
 	virtual int			OnError( NetLink* pLink, const char* pPkt, unsigned int iLen );
+
 	//<
 	virtual NetLink*	OnCreate( void ) = 0;
 };

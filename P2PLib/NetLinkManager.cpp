@@ -26,36 +26,26 @@
 #include <windows.h>
 #include <Mmsystem.h>
 
-NetLinkManager::NetLinkManager( P2PAgentHandler* pHandler, UDPLink* pLink, unsigned long iKeepConnection )
+
+NetLinkManager::NetLinkManager( const Network_IF* pNIF, P2PAgentHandler* pHandler, UDPLink* pLink, unsigned long iKeepConnection )
 : m_Handler(pHandler)
 , m_Link(pLink)
 , m_Relay(NULL)
 , m_iKeepConnection(iKeepConnection)
 {
+	m_Self = *pNIF;
 }
 
 NetLinkManager::~NetLinkManager()
 {
 	Clear();
-
-	if ( m_Link ) delete m_Link;
-	if ( m_Self ) delete m_Self;
+	if ( m_Link )
+		delete m_Link;
 }
 
-NetLink* NetLinkManager::Self(const Network_IF& rNetIF)
+NetLink* NetLinkManager::Find( const Network_IF& rNIF )
 {
-	m_Self->NetIF( rNetIF );
-	return (NetLink*)m_Self;
-}
-
-NetLink* NetLinkManager::Self( void )
-{
-	return (NetLink*)m_Self;
-}
-
-NetLink* NetLinkManager::Find( const Network_IF& rNetIF )
-{
-	NetLinkMap::iterator it = m_NetLinkMap.find( rNetIF.iID );
+	NetLinkMap::iterator it = m_NetLinkMap.find( rNIF.iNID );
 	if ( it != m_NetLinkMap.end() )
 	{
 		return it->second;
@@ -64,25 +54,23 @@ NetLink* NetLinkManager::Find( const Network_IF& rNetIF )
 	return NULL;
 }
 
-NetLink* NetLinkManager::Insert( const Network_IF& rNetIF )
+NetLink* NetLinkManager::Connect( const Network_IF& rNIF )
 {
-	NetLinkMap::iterator it = m_NetLinkMap.find( rNetIF.iID );
-	if ( it != m_NetLinkMap.end() )
-	{
-		return false;
-	}
-
-	NetLink* pLink = OnCreate();
-	pLink->NetIF( rNetIF );
-	pLink->NetST().iSt				= eSYNC_ST;
-	pLink->NetST().iReceivedPktTm	= timeGetTime();
-	m_NetLinkMap.insert( NetLinkMap::value_type(rNetIF.iID, (NetLink*)pLink) );
+	Pc* pLink = (Pc*)OnCreate();
+	pLink->NetIF( rNIF );
+	pLink->NetST( eSYNC_ST );
+	verbose( "create link %u\n", pLink->iNID );
+	m_NetLinkMap.insert( NetLinkMap::value_type(pLink->iNID, (NetLink*)pLink) );
 	return (NetLink*)pLink;
 }
 
-bool NetLinkManager::Erase( const Network_IF& rNetIF )
+bool NetLinkManager::Close( NetLink* pLink )
 {
-	NetLinkMap::iterator it = m_NetLinkMap.find( rNetIF.iID );
+	if ( !pLink )
+		return false;
+
+	NetLinkMap::iterator it;
+	it = m_NetLinkMap.find( pLink->NetIF().iNID );
 	if ( it != m_NetLinkMap.end() )
 	{
 		delete it->second;
@@ -95,19 +83,10 @@ bool NetLinkManager::Erase( const Network_IF& rNetIF )
 
 void NetLinkManager::Clear()
 {
-	m_Self->Clear();
-
 	for ( NetLinkMap::iterator it = m_NetLinkMap.begin(); it != m_NetLinkMap.end(); )
 	{
-		if ( m_Self != it->second )
-		{
-			delete it->second;
-			it = m_NetLinkMap.erase( it );
-		}
-		else
-		{
-			++it;
-		}
+		delete it->second;
+		it = m_NetLinkMap.erase( it );
 	}
 
 	while ( !m_Received.empty() )
@@ -117,14 +96,14 @@ void NetLinkManager::Clear()
 	}
 }
 
-void NetLinkManager::Process( void )
+void NetLinkManager::Process( unsigned long iWait )
 {
 	//< 패킷 수신 - MAX_PACKET_RECEIVE_TM 초 동안만 수신하고 나머지는 다음 프레임에 처리
 	unsigned long iCurrTick = timeGetTime() + MAX_PACKET_RECEIVE_TM;
-	while ( m_Link->IsReceived() && iCurrTick > timeGetTime() )
+	while ( m_Link->IsReceived(iWait) && iCurrTick > timeGetTime() )
 	{
 		P2PNET_PACKET_BASE* p = (P2PNET_PACKET_BASE*)new char[m_Link->MaxBufferSize()];
-		if ( m_Link->RecvFrom( (char*)&p->iLen, &p->Addr ) == -1 )
+		if ( m_Link->RecvFrom( (char*)&p->iLen, &p->Addr ) <= 0 )
 		{
 			delete p;
 			break;
@@ -133,54 +112,68 @@ void NetLinkManager::Process( void )
 		m_Received.push_back( p );
 	}
 
+	Pc* pLink = NULL;
+	NetLinkMap::iterator it;
+
+	// 수신 패킷 처리
 	// 수신패킷 처리
 	while ( !m_Received.empty() )
 	{
-		P2PNET_PACKET_BASE* p = m_Received.front(); m_Received.pop_front();
-		NetLinkMap::iterator it = m_NetLinkMap.find( p->iFromID );
-		Pc* pLink = NULL;
+		pLink = NULL;
+		P2PNET_PACKET_BASE* pPkt = m_Received.front(); m_Received.pop_front();
+		it = m_NetLinkMap.find( pPkt->iFromID );
 		if ( it != m_NetLinkMap.end() )
 		{
 			pLink = (Pc*)it->second;
 		}
-		else if ( p->iPackID == eP2P_SYNC )
+		else if ( pPkt->iPackID == eP2P_SYNC )
 		{
 			// 등록되지 않은 사용자는 Pc 를 생성한다.
 			Network_IF nif;
-			nif.iCellID = p->iCellID;
-			nif.iID		= p->iFromID;
-			nif.iAddr	= p->Addr.sin_addr.S_un.S_addr;
-			nif.iPort	= p->Addr.sin_port;
-			pLink		= (Pc*)Insert( nif );
+			nif.iCellID = pPkt->iCellID;
+			nif.iNID	= pPkt->iFromID;
+			nif.iAddr	= pPkt->Addr.sin_addr.S_un.S_addr;
+			nif.iPort	= pPkt->Addr.sin_port;
+			pLink		= (Pc*)Connect( nif );
+			pLink->OnSync( pPkt );
+			continue;
+		}
+		else if ( pPkt->iPackID == eP2P_JOIN )
+		{
+			P2P_JOIN_ACK p(pPkt->iPktSeq, pPkt->iCellID, Self().iNID, pPkt->iTransTick);
+			m_Link->Send((const char*)&p.iLen, p.iLen, &pPkt->Addr);
+			delete[] pPkt;
+			continue;
+		}
+		else if ( pPkt->iPackID == eP2P_LEAVE )
+		{
+			P2P_LEAVE_ACK p(pPkt->iPktSeq, pPkt->iCellID, Self().iNID, pPkt->iTransTick);
+			m_Link->Send((const char*)&p.iLen, p.iLen, &pPkt->Addr);
+			delete[] pPkt;
+			continue;
 		}
 		else
 		{
-			delete[] p;
+			verbose( "pkt id %d, from %u\n", pPkt->iPackID, pPkt->iFromID );
+			delete[] pPkt;
 			continue;
 		}
 
-		pLink->OnReceived( p );
+		pLink->OnReceived( pPkt );
 	}
 
-	// 패킷 전송 및 홀펀칭
-	for ( NetLinkMap::iterator it = m_NetLinkMap.begin(); it != m_NetLinkMap.end(); )
+	// 패킷 전송 및 연결유지
+	for ( it = m_NetLinkMap.begin(); it != m_NetLinkMap.end(); )
 	{
-		Pc* pLink = (Pc*)it->second;
-		switch ( pLink->iSt )
+		pLink = (Pc*)it->second;
+		switch ( pLink->m_iSt )
 		{
-		case eSYNC_ST		:
-			{
-				pLink->Sync();
-			}
+		case eSYNC_ST :
+			pLink->Sync();
 			break;
-		case eLINK_ST		:
-			if ( pLink->iKeepConnection <= timeGetTime() )
+		case eLINK_ST :
+			if ( pLink->KeepConnection() )
 			{
-				pLink->KeepConnection();
-			}
-			if ( pLink->iReceivedPktTm + m_iKeepConnection + pLink->Latency() <= timeGetTime() )
-			{
-				OnClosed( pLink );
 				it = m_NetLinkMap.erase( it );
 				delete pLink;
 				continue;
@@ -206,10 +199,10 @@ P2PAgentHandler* NetLinkManager::Handler( P2PAgentHandler* pHandler )
 	return m_Handler;
 }
 
-NetLink* NetLinkManager::Relay( const Network_IF& rNetIF )
+NetLink* NetLinkManager::Relay( const Network_IF& rNIF )
 {
-	m_Relay = Insert( rNetIF);
-	verbose( "create relay %d, public %s\n", m_Relay->NetIF().iID, Util::Addr2Str(&m_Relay->NetIF()).c_str() );
+	m_Relay = Connect( rNIF );
+	verbose( "create relay %u, public %s\n", m_Relay->NetIF().iNID, Util::Addr2Str(&m_Relay->NetIF()).c_str() );
 	return m_Relay;
 }
 
@@ -217,6 +210,7 @@ NetLink* NetLinkManager::Relay( void )
 {
 	return m_Relay;
 }
+
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 int	NetLinkManager::OnConnected( NetLink* pLink )

@@ -18,6 +18,7 @@
 
 #include <Pc.h>
 
+//<
 class RelayPcManager;
 class RelayPc : public Pc
 {
@@ -25,12 +26,12 @@ class RelayPc : public Pc
 public:
 	RelayPc();
 	RelayPc(RelayPcManager* pNetPcMgr, UDPLink* pLink);
-	RelayPc(const RelayPc& r);
 	virtual ~RelayPc();
 
 public:
 	void	Process( void );
 	void	Clear( void );
 	void	PushControl( P2PNET_PACKET_BASE* pPkt );
+	int		OnControlAck( P2PNET_PACKET_BASE* pPkt );
 	int		OnReceived( P2PNET_PACKET_BASE* pPkt );
 };

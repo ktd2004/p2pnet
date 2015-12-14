@@ -19,11 +19,13 @@
 //<
 #include "NetLinkManager.h"
 
+//<
 class NetPcManager : public NetLinkManager
 {
 public:
-	NetPcManager( P2PAgentHandler* pHandler, UDPLink* pLink, unsigned long iKeepConnection );
+	NetPcManager( const Network_IF* pNIF, P2PAgentHandler* pHandler, UDPLink* pLink, unsigned long iKeepConnection );
 	virtual ~NetPcManager();
 
-	virtual NetLink*	OnCreate( void );
+	//< NetLinkManager
+	NetLink*	OnCreate( void );
 };

@@ -23,52 +23,50 @@
 #include <Util.h>
 
 
-P2PAgent* RendezvousAgentFactory::Create( const std::string& sIP, unsigned short iPort, unsigned int iMaxBufferSize, unsigned long iKeepConnection )
+P2PAgent* RendezvousAgentFactory::Create( const Network_IF& NIF, unsigned int iMaxBufferSize, unsigned long iKeepConnection )
 {
 	WSADATA WSAData;
 	if( WSAStartup( MAKEWORD(2, 2), &WSAData) != 0 )
 	{
-		printf( "WSAStartup failure: Error=%d\r\n", WSAGetLastError() );
+		printf( "WSAStartup failure: error=%d\n", WSAGetLastError() );
 		return NULL;
 	}
 
-	UDPLink* pUDP = new UDPLink;
+	UDPLink* pUDP			= new UDPLink;
+	std::string sIP			= Util::NetIF2IP( &NIF );
+	unsigned short iPort	= Util::NetIF2Port( &NIF );
 	if ( !pUDP->Open(sIP, iPort, iMaxBufferSize) )
 	{
 		delete pUDP;
 		return NULL;
 	}
 
-	RelayPcManager* pMgr = new RelayPcManager(pUDP, iKeepConnection);
+	RelayPcManager* pMgr = new RelayPcManager(&NIF, pUDP, iKeepConnection);
 	return pMgr;
 }
 
-P2PAgent* RendezvousAgentFactory::Join( P2PAgentHandler* pHdr, const std::string& sIP, unsigned short iPort,
-	const std::string& sRendezvousIP, unsigned short iRendezvousPort, unsigned int iMaxBufferSize, unsigned long iKeepConnection )
+P2PAgent* RendezvousAgentFactory::Join( const Network_IF& NIF, P2PAgentHandler* pHandler,
+	 const Network_IF& RendezvousNIF, unsigned int iMaxBufferSize, unsigned long iKeepConnection )
 {
-	if ( pHdr == NULL )
-		return NULL;
-
 	// self
 	WSADATA WSAData;
 	if( WSAStartup( MAKEWORD(2, 2), &WSAData) != 0 )
 	{
-		printf( "WSAStartup failure: Error=%d\r\n", WSAGetLastError() );
+		printf( "WSAStartup failure: error=%d\r\n", WSAGetLastError() );
 		return NULL;
 	}
 
-	UDPLink* pUDP = new UDPLink;
+	UDPLink* pUDP			= new UDPLink;
+	std::string sIP			= Util::NetIF2IP( &NIF );
+	unsigned short iPort	= Util::NetIF2Port( &NIF );
 	if ( !pUDP->Open(sIP, iPort, iMaxBufferSize) )
 	{
 		delete pUDP;
 		return NULL;
 	}
 
-	NetPcManager* pMgr = new NetPcManager(pHdr, pUDP, iKeepConnection);
-
-	Network_IF nif;
-	Util::SetNetworkAddress( &nif, sRendezvousIP, iRendezvousPort );
-	pMgr->Relay( nif );
+	NetPcManager* pMgr = new NetPcManager(&NIF, pHandler, pUDP, iKeepConnection);
+	pMgr->Relay( RendezvousNIF );
 
 	return pMgr;
 }

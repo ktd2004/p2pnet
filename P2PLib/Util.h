@@ -41,25 +41,32 @@ namespace Util
 		pPkt->Addr.sin_addr.S_un.S_addr = rNetIF.iAddr;
 	}
 
-	inline void SetUniqueID( Network_IF* pNetIF, const std::string& sIP, unsigned short iPort )
+#define shift(v,n)				(((unsigned __int64)v) << n)
+#define addr2nid(addr,v)		shift(addr.sin_addr.S_un.S_addr,32) | shift(addr.sin_port,16) | shift(v,0)
+
+	inline void SetNetworkAddress( Network_IF* pNIF, const std::string& sIP, unsigned short iPort )
 	{
-		char szBuf[256];
-		int iLen = sprintf_s( szBuf, sizeof(szBuf), "%s:%u", sIP.c_str(), iPort );
-		pNetIF->iID = Md5Hash::ToNumber( szBuf );
+		pNIF->iAddr = inet_addr( sIP.c_str() );	// network address 로 변환
+		pNIF->iPort = htons( iPort );				// network port 로 변환
 	}
 
-	inline void SetNetworkAddress( Network_IF* pNetIF, const std::string& sIP, unsigned short iPort )
-	{
-		SetUniqueID( pNetIF, sIP, iPort );
-		pNetIF->iAddr = inet_addr( sIP.c_str() );	// network address 로 변환
-		pNetIF->iPort = htons( iPort );				// network port 로 변환
-	}
-
-	inline std::string Addr2Str( Network_IF* pNetIF )
+	inline std::string Addr2Str( Network_IF* pNIF )
 	{
 		SOCKADDR_IN addr;
-		addr.sin_addr.S_un.S_addr = pNetIF->iAddr;
-		char szBuf[25]; sprintf_s( szBuf, sizeof(szBuf), "%s:%u", inet_ntoa(addr.sin_addr), ntohs(pNetIF->iPort) );
+		addr.sin_addr.S_un.S_addr = pNIF->iAddr;
+		char szBuf[25]; sprintf_s( szBuf, sizeof(szBuf), "%s:%u", inet_ntoa(addr.sin_addr), ntohs(pNIF->iPort) );
 		return szBuf;
+	}
+
+	inline std::string NetIF2IP( const Network_IF* pNIF )
+	{
+		SOCKADDR_IN addr;
+		addr.sin_addr.S_un.S_addr = pNIF->iAddr;
+		return inet_ntoa(addr.sin_addr);
+	}
+
+	inline unsigned short NetIF2Port( const Network_IF* pNIF )
+	{
+		return ntohs(pNIF->iPort);
 	}
 };

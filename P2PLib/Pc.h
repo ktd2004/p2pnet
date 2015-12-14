@@ -16,47 +16,67 @@
  */
 #pragma once
 
+//<
 #include <NetLink.h>
 
+//<
 #include "P2PPkt.h"
 #include "UDPLink.h"
 #include "Compile.h"
 
+//<
 class Pc : public NetLink
 {
 public:
 	//<
 	NetLinkManager*		m_NetLinkManager;
 	UDPLink*			m_Link;						// udp socket
-	P2PNET_PACKET_LIST	m_Reliable;					// send reliable packet list
-	P2PNET_PACKET_LIST	m_Reserved;					// send unreliable packet
-	P2PNET_PACKET_LIST	m_WaitReliable;				// wait reliable packet
+	P2PNET_PACKET_LIST	m_Reliable,					// send reliable packet list
+						m_Reserved,					// send unreliable packet
+						m_WaitReliable;				// wait reliable packet
 	unsigned long		m_Latency[MAX_LATENCY];		// latency
 	unsigned long		m_iSyncTm;					// sync time
 	unsigned short		m_iSyncCnt;					// sync count
+	unsigned long		m_iSelfAddr;				// self addr ( assigned by sync ack )
+	unsigned short		m_iSelfPort;				// self port ( assigned by sync ack )
+	unsigned long		m_iKeepConnection;			// keep connection interval
+	unsigned long		m_iReceivedPktTm;			// packet received time
+	unsigned long		m_iAvgLatency;				// avg latency
+
+	//<
+	eLinkST				m_iSt;						// link state
+	PKTSEQ				m_iUnreliablePktSeq,		// unreliable packet seq
+						m_iReliablePktSeq,			// reliable packet seq
+						m_iWishReliablePktSeq,		// wish reliable packet seq
+						m_iControlPktSeq,			// control packet seq
+						m_iWishControlPktSeq;		// wish control packet seq
 
 public:
 	Pc();
 	Pc(NetLinkManager* pNetLinkMgr, UDPLink* pLink);
 	virtual ~Pc();
+	void Init(NetLinkManager* pNetLinkMgr, UDPLink* pLink);
 
 public:
 	//< NetLink
 	Network_IF&		NetIF( void );
 	void			NetIF( const Network_IF& r );
-	Network_ST&		NetST( void );
-	void			NetST( const Network_ST& r );
+	eLinkST			NetST( void );
+	void			NetST( const eLinkST r );
 	bool			Push( const char* pPkt, unsigned int iLen, bool bReliable = false );
 	virtual void	Process( void );
 	virtual void	Clear( void );
 	//<
 	void			Sync( void );
-	void			KeepConnection( void );
+	bool			KeepConnection( void );
 	bool			Push( P2PNET_PACKET_BASE* pPkt, bool bReliable );
-	virtual int		OnReceived( P2PNET_PACKET_BASE* pPkt );
 	void			Latency( unsigned long iLatency );
 	unsigned long	Latency( void );
-	//<
-	unsigned long	GetAverageLatency( NetLink* pLink );
 	static int		SortLatency( const void *arg1, const void *arg2 );
+	//<
+	int				OnSync( P2PNET_PACKET_BASE* pPkt );
+	int				OnSyncAck( P2PNET_PACKET_BASE* pPkt );
+	int				OnKeepConnection( P2PNET_PACKET_BASE* pPkt );
+	virtual int		OnReceived( P2PNET_PACKET_BASE* pPkt ) = 0;
+
 };

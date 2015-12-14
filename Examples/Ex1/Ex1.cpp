@@ -53,7 +53,7 @@ struct NetHandler : public P2PAgentHandler
 
 int _tmain(int argc, _TCHAR* argv[])
 {
-/*
+/*	Buffer Å×½ºÆ®
 	Buffer	buf;
 
 	buf << "this is test packet";
@@ -85,6 +85,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	
 	return 0;
 */
+
 	if ( argc == 1 )
 		return 0;
 
@@ -94,33 +95,34 @@ int _tmain(int argc, _TCHAR* argv[])
 	if ( strcmp(argv[1], "server") == 0 )
 	{
 		// self
-		pAgent = P2PAgentFactory::Create( &Hdr, "127.0.0.1", 25533 );
-		NetLink* pSelf = pAgent->Self();
-		printf( "self %u, %s\n", pSelf->NetIF().iID, P2PUtil::Addr2Str(&pSelf->NetIF()).c_str() );
+		Network_IF nif(1, "127.0.0.1", 25533);
+		pAgent = P2PAgentFactory::Create( nif, &Hdr );
+		if ( !pAgent ) return 0;
+
+		printf( "self %u, %s\n", pAgent->Self().iNID, P2PUtil::Addr2Str(&pAgent->Self()).c_str() );
 
 		while (1)
 		{
-			pAgent->Process();
-			Sleep(100);
+			pAgent->Process( 100 );
 		}
 	}
 	else
 	{
 		// self id
-		pAgent = P2PAgentFactory::Create( &Hdr, "127.0.0.1", 25534 );
-		NetLink* pSelf = pAgent->Self();
-		printf( "self %u, %s\n", pSelf->NetIF().iID, P2PUtil::Addr2Str(&pSelf->NetIF()).c_str() );
+		Network_IF nif(2, "127.0.0.1", 25534);
+		pAgent = P2PAgentFactory::Create( nif, &Hdr );
+		if ( !pAgent ) return 0;
+
+		printf( "self %u, %s\n", pAgent->Self().iNID, P2PUtil::Addr2Str(&pAgent->Self()).c_str() );
 
 		// peer
-		Network_IF NetIF;
-		P2PUtil::SetNetworkAddress( &NetIF, "127.0.0.1", 25533 );
-		printf( "peer %u, %s\n", NetIF.iID, P2PUtil::Addr2Str(&NetIF).c_str() );
-		NetLink* pLink = pAgent->Insert( NetIF );
+		Network_IF peer_nif(1, "127.0.0.1", 25533);
+		NetLink* pLink = pAgent->Connect( peer_nif );
 
 		unsigned long iSendTick = 0;
 		while (1)
 		{
-			if ( pLink && pLink->NetST().iSt == eLINK_ST && iSendTick <= timeGetTime() )
+			if ( pLink && pLink->NetST() == eLINK_ST && iSendTick <= timeGetTime() )
 			{
 				char szBuf[1024];
 				int iLen = sprintf_s(szBuf, 1024, "this is test" );
@@ -128,8 +130,7 @@ int _tmain(int argc, _TCHAR* argv[])
 				iSendTick = timeGetTime() + 1000;
 
 			}
-			pAgent->Process();
-			Sleep(100);
+			pAgent->Process( 100 );
 		}
 	}
 

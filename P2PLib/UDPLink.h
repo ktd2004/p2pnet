@@ -21,19 +21,18 @@
 #include <WinSock2.h>
 #include <string>
 
-///////////////////////////////////////////////////////////////////////////
-// UDP 패킷 송수신 클래스
+//< udp socket
 class UDPLink
 {
 	friend class NetPc;
 	friend class NetPcManager;
 	friend class NetLinkManager;
 private:
-	SOCKET			m_hSocket;				// 소캣
-	unsigned int 	m_iMaxBufferSize;		// 최대 수신 패킷의 크기
-	struct timeval  m_Wait;
-	fd_set			m_wFdSet;
-	fd_set			m_rFdSet;
+	SOCKET			m_hSocket;				// socket
+	unsigned int 	m_iMaxBufferSize;		// max packet buffer size
+	struct timeval  m_Wait;					// wait for event
+	fd_set			m_wFdSet;				// write
+	fd_set			m_rFdSet;				// read
 
 public:
 	UDPLink();
@@ -52,6 +51,6 @@ public:
 	void			MaxBufferSize( unsigned int  iMaxBufferSize ) { m_iMaxBufferSize = iMaxBufferSize; }
 	unsigned int	MaxBufferSize( void ) { return m_iMaxBufferSize; }
 	int				Send( const char* pszBuf, unsigned int iLen, SOCKADDR_IN* to );
-	bool			IsReceived( void );			
+	bool			IsReceived( unsigned long iWait );			
 	int				RecvFrom( char* pszBuf, SOCKADDR_IN* from );
 };

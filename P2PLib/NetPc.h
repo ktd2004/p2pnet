@@ -18,15 +18,22 @@
 
 #include "Pc.h"
 
+//<
 class NetPcManager;
 class NetPc : public Pc
 {
 public:
+
+public:
 	NetPc();
 	NetPc(NetPcManager* pNetPcMgr, UDPLink* pLink);
-	NetPc(const NetPc& r);
 	virtual ~NetPc();
 
 public:
+	//<
+	int		OnJoin( P2PNET_PACKET_BASE* pPkt );
+	int		OnLeave( P2PNET_PACKET_BASE* pPkt );
+	int		OnReliableAck( P2PNET_PACKET_BASE* pPkt );
+	int		OnReliableSendTo( P2PNET_PACKET_BASE* pPkt );
 	int		OnReceived( P2PNET_PACKET_BASE* pPkt );
 };

@@ -18,11 +18,10 @@
 
 #include <P2PAgent.h>
 
+//< rendezvous agent
 struct RendezvousAgentFactory
 {
-	static P2PAgent*	Create( const std::string& sIP, unsigned short iPort,
-							unsigned int iMaxBufferSize = 4096, unsigned long iKeepConnection = 1000 );
-	static P2PAgent*	Join( P2PAgentHandler* pHdr, const std::string& sIP, unsigned short iPort, 
-							const std::string& sRendezvousIP, unsigned short iRendezvousPort,
+	static P2PAgent*	Create( const Network_IF& NIF,	unsigned int iMaxBufferSize = 4096, unsigned long iKeepConnection = 1000 );
+	static P2PAgent*	Join( const Network_IF& NIF, P2PAgentHandler* pHandler, const Network_IF& RendezvousNIF,
 							unsigned int iMaxBufferSize = 4096, unsigned long iKeepConnection = 1000 );
 };

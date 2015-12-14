@@ -36,21 +36,6 @@ RelayPc::RelayPc(RelayPcManager* pRelayPcMgr, UDPLink* pLink)
 {
 }
 
-RelayPc::RelayPc(const RelayPc& r)
-{
-	this->m_NetLinkManager		= r.m_NetLinkManager;
-	this->m_Link				= r.m_Link;
-	this->iCellID				= r.iCellID;
-	this->iID					= r.iID;
-	this->iAddr					= r.iAddr;
-	this->iPort					= r.iPort;
-	this->iSt					= r.iSt;
-	this->iUnreliablePktSeq		= r.iUnreliablePktSeq;
-	this->iReliablePktSeq		= r.iReliablePktSeq;
-	this->iWishReliablePktSeq	= r.iWishReliablePktSeq;
-	this->iControlPktSeq		= r.iControlPktSeq;
-	this->iWishControlPktSeq	= r.iWishControlPktSeq;
-}
 
 RelayPc::~RelayPc()
 {
@@ -67,13 +52,14 @@ void RelayPc::Process( void )
 		unsigned long iTick = timeGetTime();
 		if ( p->iTransTick <= iTick )
 		{
+//			verbose( "send control %s\n", Util::Addr2Str(&NetIF()).c_str() );
 			p->iTransTick = iTick;
 			if ( m_Link->Send((const char*)&p->iLen, p->iLen, &p->Addr) == -1 )
 			{
 				m_NetLinkManager->OnError( this, PKT_DATA_POS(p), PKT_DATA_LEN(p) );
 				break;
 			}
-			p->iTransTick = iTick + iAvgLatency;
+			p->iTransTick = iTick + m_iAvgLatency;
 		}
 	}
 }
@@ -91,45 +77,57 @@ void RelayPc::Clear( void )
 void RelayPc::PushControl( P2PNET_PACKET_BASE* pPkt )
 {
 	Util::SetNetworkAddress( pPkt, NetIF() );
-	pPkt->iFromID = m_NetLinkManager->Self()->NetIF().iID;
-	pPkt->iPktSeq = iControlPktSeq++;
+//	pPkt->iFromID = iNID;
+	pPkt->iPktSeq = m_iControlPktSeq++;
 	m_Control.push_back( pPkt );
+}
+
+int RelayPc::OnControlAck( P2PNET_PACKET_BASE* pPkt )
+{
+	m_iReceivedPktTm = timeGetTime();
+
+	Latency(  m_iReceivedPktTm - pPkt->iTransTick );
+	verbose( "recv control ack %lu\n", pPkt->iPktSeq );
+	for ( P2PNET_PACKET_LIST::iterator it = m_Control.begin(); it != m_Control.end(); it++ )
+	{
+		P2PNET_PACKET_BASE* p = *it;
+		if ( p->iPktSeq == pPkt->iPktSeq )
+		{
+			verbose( "erase control ack %lu\n", pPkt->iPktSeq );
+			m_Control.erase( it );
+			m_NetLinkManager->OnSended( this, PKT_DATA_POS(p), PKT_DATA_LEN(p) );
+			delete[] p;
+			break;
+		}
+	}
+
+	delete[] pPkt;
+
+	return 1;
 }
 
 int RelayPc::OnReceived( P2PNET_PACKET_BASE* pPkt )
 {
-	if ( Pc::OnReceived(pPkt) )
-	{
-		delete[] pPkt;
-		return 1;
-	}
-
 	switch (pPkt->iPackID)
 	{
-	case eP2P_JOIN_ACK				:
-	case eP2P_LEAVE_ACK				:
-		{
-			Latency(  NetST().iReceivedPktTm - pPkt->iTransTick );
-			verbose( "recv control ack %d\n", pPkt->iPktSeq );
-			for ( P2PNET_PACKET_LIST::iterator it = m_Control.begin(); it != m_Control.end(); it++ )
-			{
-				P2PNET_PACKET_BASE* p = *it;
-				if ( p->iPktSeq == pPkt->iPktSeq )
-				{
-					verbose( "erase control ack %d\n", pPkt->iPktSeq );
-					m_Control.erase( it );
-					m_NetLinkManager->OnSended( this, PKT_DATA_POS(p), PKT_DATA_LEN(p) );
-					delete[] p;
-					break;
-				}
-			}
-		}
+	case eP2P_SYNC :
+		OnSync( pPkt );
+		break;
+	case eP2P_SYNC_ACK :
+		OnSyncAck( pPkt );
+		break;
+	case eP2P_KEEPING_CONNECTION :
+		OnKeepConnection( pPkt );
+		break;
+	case eP2P_JOIN_ACK :
+	case eP2P_LEAVE_ACK :
+		OnControlAck( pPkt );
 		break;
 	default :
+		m_iReceivedPktTm = timeGetTime();
 		m_NetLinkManager->OnReceived( this, (const char*)pPkt, pPkt->iLen );
 		return 1;
 	}
 	
-	delete[] pPkt;
 	return 1;
 }

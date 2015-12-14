@@ -23,12 +23,12 @@ struct NetHandler : public P2PAgentHandler
 {
 	int	OnConnected( NetLink* pLink )
 	{
-		printf( __FUNCTION__": peer %u, %s\n", pLink->NetIF().iID, P2PUtil::Addr2Str(&pLink->NetIF()).c_str() );
+		printf( __FUNCTION__": peer %u, %s\n", pLink->NetIF().iNID, P2PUtil::Addr2Str(&pLink->NetIF()).c_str() );
 		return 0;
 	}
 	int	OnClosed( NetLink* pLink )
 	{
-		printf( __FUNCTION__": peer %u, %s\n", pLink->NetIF().iID, P2PUtil::Addr2Str(&pLink->NetIF()).c_str() );
+		printf( __FUNCTION__": peer %u, %s\n", pLink->NetIF().iNID, P2PUtil::Addr2Str(&pLink->NetIF()).c_str() );
 		return 0;
 	}
 	int	OnReceived( NetLink* pLink, const char* pPkt, unsigned int iLen )
@@ -57,41 +57,46 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	if ( strcmp(argv[1], "server") == 0 )
 	{
-		pAgent = RendezvousAgentFactory::Create( "127.0.0.1", 65522 );
-		NetLink* pSelf = pAgent->Self();
-		printf( "self %u, %s\n", pSelf->NetIF().iID, P2PUtil::Addr2Str(&pSelf->NetIF()).c_str() );
+		Network_IF nif(100, "127.0.0.1", 65522);
+		pAgent = RendezvousAgentFactory::Create( nif );
 		if ( !pAgent ) return 0;
+
+		printf( "self %u, addr %s\n", pAgent->Self().iNID, P2PUtil::Addr2Str(&pAgent->Self()).c_str() );
 
 		while ( 1 )
 		{
-			pAgent->Process();
-			Sleep(100);
+			pAgent->Process( 100 );
 		}
 	}
 	else
 	{
 		// Rendezvous
-		pAgent = RendezvousAgentFactory::Join( &Hdr, "127.0.0.1", atoi(argv[1]), "127.0.0.1", 65522, 4096 );
-		NetLink* pSelf = pAgent->Self();
-		printf( "self %u, %s\n", pSelf->NetIF().iID, P2PUtil::Addr2Str(&pSelf->NetIF()).c_str() );
-		
+		Network_IF nif(atoi(argv[1]), "127.0.0.1", atoi(argv[2]));
+		Network_IF rendezvous_nif(100, "127.0.0.1", 65522 );
+		pAgent = RendezvousAgentFactory::Join( nif, &Hdr, rendezvous_nif );
+		if ( !pAgent ) return 0;
+
+		printf( "self %u, addr %s\n", pAgent->Self().iNID, P2PUtil::Addr2Str(&pAgent->Self()).c_str() );
+
 		unsigned long iSendTick = timeGetTime() + 1000 * 10;
 		while (1)
 		{
 			NetLinkMap::iterator it;
 			for ( it = pAgent->GetHashMap().begin(); it != pAgent->GetHashMap().end(); ++it )
 			{
-				if ( it->second->NetST().iSt == eLINK_ST && pAgent->Relay() != it->second && iSendTick < timeGetTime() )
+				if ( it->second->NetST() == eLINK_ST &&
+					 pAgent->Relay() != it->second &&
+					 iSendTick < timeGetTime() )
 				{
+					printf( "send %u\n", it->second->NetIF().iNID );
 					char szBuf[1024];
-					int iLen = sprintf_s(szBuf, 1024, "this is test" );
+					int iLen = sprintf_s(szBuf, 1024, "this is test");
 					it->second->Push( szBuf, iLen+1, true );
-					iSendTick = timeGetTime() + 1000 * 10;
+ 					iSendTick = timeGetTime() + 1000 * 10;
 				}
 			}
 
-			pAgent->Process();
-			Sleep(100);
+			pAgent->Process(100);
 		}
 
 	}

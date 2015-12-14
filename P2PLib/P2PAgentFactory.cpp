@@ -19,26 +19,26 @@
 #include "NetPcManager.h"
 #include "Util.h"
 
-P2PAgent* P2PAgentFactory::Create( P2PAgentHandler* pHandler, const std::string& sIP, unsigned short iPort, unsigned int iMaxBufferSize, unsigned long iKeepConnection )
+P2PAgent* P2PAgentFactory::Create( const Network_IF& NIF, P2PAgentHandler* pHandler,
+	unsigned int iMaxBufferSize, unsigned long iKeepConnection )
 {
-	if ( pHandler == NULL )
-		return NULL;
-
 	WSADATA WSAData;
 	if( WSAStartup( MAKEWORD(2, 2), &WSAData) != 0 )
 	{
-		printf( "WSAStartup failure: Error=%d\r\n", WSAGetLastError() );
+		printf( "WSAStartup failure: error=%d\r\n", WSAGetLastError() );
 		return NULL;
 	}
 
-	UDPLink* pUDP = new UDPLink;
+	UDPLink* pUDP			= new UDPLink;
+	std::string sIP			= Util::NetIF2IP( &NIF );
+	unsigned short iPort	= Util::NetIF2Port( &NIF );
 	if ( !pUDP->Open(sIP, iPort, iMaxBufferSize) )
 	{
 		delete pUDP;
 		return NULL;
 	}
 
-	NetPcManager* pMgr = new NetPcManager(pHandler, pUDP, iKeepConnection);
+	NetPcManager* pMgr = new NetPcManager(&NIF, pHandler, pUDP, iKeepConnection);
 	return pMgr;
 }
 

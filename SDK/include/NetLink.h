@@ -19,31 +19,37 @@
 #include <string>
 #include <WinSock2.h>
 
-//////////////////////////////////////////////////////////////////////////////////////
-// NetLink 의 네트웍 정보
+typedef unsigned int		TNID;
+
+//< link network information
 struct Network_IF
 {
-	unsigned int	iCellID;
-	unsigned int	iID;		// link unique id
-	unsigned long	iAddr;		// ip
-	unsigned short	iPort;		// port
+	unsigned int		iCellID;	// cell id
+	TNID				iNID;		// network id
+	unsigned long		iAddr;		// ip
+	unsigned short		iPort;		// port
 	Network_IF()
 		: iCellID(0)
-		, iID(0)
+		, iNID(0)
 		, iAddr(0)
 		, iPort(0)
 	{}
-	Network_IF(unsigned int _iID)
+	Network_IF( TNID ID )
 		: iCellID(0)
-		, iID(_iID)
+		, iNID(ID)
 		, iAddr(0)
 		, iPort(0)
 	{}
+	Network_IF( TNID ID, const std::string& sIP, unsigned short iPort )
+		: iCellID(0)
+		, iNID(ID)
+	{
+		this->iAddr = inet_addr( sIP.c_str() );		// network address 로 변환
+		this->iPort = htons( iPort );				// network port 로 변
+	}
 };
 
-//////////////////////////////////////////////////////////////////////////////////////
-// NetLink 의 상태정보
-
+//< link status
 enum eLinkST
 {
 	eUNLINK_ST,		// initial state
@@ -52,38 +58,14 @@ enum eLinkST
 	eLINK_ST,		// link state
 };
 
-struct Network_ST
-{
-	unsigned short	iSt;					// link state
-	unsigned long	iUnreliablePktSeq;		// unreliable packet seq
-	unsigned long	iReliablePktSeq;		// reliable packet seq
-	unsigned long	iWishReliablePktSeq;	// wish reliable packet seq
-	unsigned long	iControlPktSeq;			// control packet seq
-	unsigned long	iWishControlPktSeq;		// wish control packet seq
-	unsigned long	iKeepConnection;		// keep connection interval
-	unsigned long	iReceivedPktTm;			// packet received time
-	unsigned long	iAvgLatency;			// avg latency
-	Network_ST()
-		: iSt(eUNLINK_ST)
-		, iUnreliablePktSeq(0)
-		, iReliablePktSeq(0)
-		, iWishReliablePktSeq(0)
-		, iControlPktSeq(0)
-		, iWishControlPktSeq(0)
-		, iKeepConnection(0)
-		, iReceivedPktTm(0)
-		, iAvgLatency(0)
-	{}
-};
 
-//////////////////////////////////////////////////////////////////////////////////////
-// NetLink
-struct NetLink : public Network_IF, public Network_ST
+//< link class
+struct NetLink : public Network_IF
 {
 	virtual Network_IF&			NetIF( void ) = 0;
 	virtual void				NetIF( const Network_IF& r ) = 0;
-	virtual Network_ST&			NetST( void ) = 0;
-	virtual void				NetST( const Network_ST& r ) = 0;
+	virtual eLinkST				NetST( void ) = 0;
+	virtual void				NetST( const eLinkST r ) = 0;
 	virtual bool				Push( const char* pPkt, unsigned int iLen, bool bReliable = false ) = 0;
 	virtual void				Clear( void ) = 0;
 };

@@ -19,18 +19,18 @@
 //<
 #include <NetLinkManager.h>
 
-class RelayPcManager : public NetLinkManager, public P2PAgentHandler
+//<
+class RelayPcManager : public NetLinkManager
 {
 public:
-	RelayPcManager( UDPLink* pLink, unsigned long iKeepConnection );
+	RelayPcManager( const Network_IF* pNIF, UDPLink* pLink, unsigned long iKeepConnection );
 	virtual ~RelayPcManager();
 
 	//< NetLinkManager
-	virtual NetLink*	OnCreate( void );
-
-	int		OnConnected( NetLink* pLink );
-	int		OnClosed( NetLink* pLink );
-	int		OnReceived( NetLink* pLink, const char* pPkt, unsigned int iLen );
-	int		OnSended( NetLink* pLink, const char* pPkt, unsigned int iLen );
-	int		OnError( NetLink* pLink, const char* pPkt, unsigned int iLen );
+	NetLink*	OnCreate( void );
+	int			OnConnected( NetLink* pLink );
+	int			OnClosed( NetLink* pLink );
+	int			OnReceived( NetLink* pLink, const char* pPkt, unsigned int iLen );
+	int			OnSended( NetLink* pLink, const char* pPkt, unsigned int iLen );
+	int			OnError( NetLink* pLink, const char* pPkt, unsigned int iLen );
 };
