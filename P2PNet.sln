@@ -1,0 +1,61 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 10.00
+# Visual Studio 2008
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "SDK", "SDK", "{D46A5868-DC42-47B9-9D90-1079D15321E3}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "include", "include", "{32195DEE-49F6-4161-A5A0-5A8111F80749}"
+	ProjectSection(SolutionItems) = preProject
+		SDK\include\Buffer.h = SDK\include\Buffer.h
+		SDK\include\FastList.h = SDK\include\FastList.h
+		SDK\include\NetLink.h = SDK\include\NetLink.h
+		SDK\include\P2PAgent.h = SDK\include\P2PAgent.h
+		SDK\include\P2PEngine.h = SDK\include\P2PEngine.h
+		SDK\include\RendezvousAgent.h = SDK\include\RendezvousAgent.h
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "P2PLib", "P2PLib\P2PLib.vcproj", "{E8658B83-356E-4A8C-9278-0FE73B710212}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "RendezvousLib", "RendezvousLib\RendezvousLib.vcproj", "{4D98A487-ACC1-4D19-A3A2-07068A51D7BC}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Examples", "Examples", "{0E888CE1-7EB9-4568-A415-06E14060A4D7}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Libs", "Libs", "{1C8886A8-44FD-482B-81A2-24AC850D3F0E}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Ex1", "Examples\Ex1\Ex1.vcproj", "{E39CF6AF-C555-4D07-A917-7C4D73FAEAC9}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Ex2", "Examples\Ex2\Ex2.vcproj", "{7195B12A-924E-4E87-B361-68959754D0E4}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{E8658B83-356E-4A8C-9278-0FE73B710212}.Debug|Win32.ActiveCfg = Debug|Win32
+		{E8658B83-356E-4A8C-9278-0FE73B710212}.Debug|Win32.Build.0 = Debug|Win32
+		{E8658B83-356E-4A8C-9278-0FE73B710212}.Release|Win32.ActiveCfg = Release|Win32
+		{E8658B83-356E-4A8C-9278-0FE73B710212}.Release|Win32.Build.0 = Release|Win32
+		{4D98A487-ACC1-4D19-A3A2-07068A51D7BC}.Debug|Win32.ActiveCfg = Debug|Win32
+		{4D98A487-ACC1-4D19-A3A2-07068A51D7BC}.Debug|Win32.Build.0 = Debug|Win32
+		{4D98A487-ACC1-4D19-A3A2-07068A51D7BC}.Release|Win32.ActiveCfg = Release|Win32
+		{4D98A487-ACC1-4D19-A3A2-07068A51D7BC}.Release|Win32.Build.0 = Release|Win32
+		{E39CF6AF-C555-4D07-A917-7C4D73FAEAC9}.Debug|Win32.ActiveCfg = Debug|Win32
+		{E39CF6AF-C555-4D07-A917-7C4D73FAEAC9}.Debug|Win32.Build.0 = Debug|Win32
+		{E39CF6AF-C555-4D07-A917-7C4D73FAEAC9}.Release|Win32.ActiveCfg = Release|Win32
+		{E39CF6AF-C555-4D07-A917-7C4D73FAEAC9}.Release|Win32.Build.0 = Release|Win32
+		{7195B12A-924E-4E87-B361-68959754D0E4}.Debug|Win32.ActiveCfg = Debug|Win32
+		{7195B12A-924E-4E87-B361-68959754D0E4}.Debug|Win32.Build.0 = Debug|Win32
+		{7195B12A-924E-4E87-B361-68959754D0E4}.Release|Win32.ActiveCfg = Release|Win32
+		{7195B12A-924E-4E87-B361-68959754D0E4}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{32195DEE-49F6-4161-A5A0-5A8111F80749} = {D46A5868-DC42-47B9-9D90-1079D15321E3}
+		{E39CF6AF-C555-4D07-A917-7C4D73FAEAC9} = {0E888CE1-7EB9-4568-A415-06E14060A4D7}
+		{7195B12A-924E-4E87-B361-68959754D0E4} = {0E888CE1-7EB9-4568-A415-06E14060A4D7}
+		{E8658B83-356E-4A8C-9278-0FE73B710212} = {1C8886A8-44FD-482B-81A2-24AC850D3F0E}
+		{4D98A487-ACC1-4D19-A3A2-07068A51D7BC} = {1C8886A8-44FD-482B-81A2-24AC850D3F0E}
+	EndGlobalSection
+EndGlobal
